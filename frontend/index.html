@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance360</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      font-family: 'Poppins', sans-serif;
+      --bg: #eef6ff;
+      --card: #ffffff;
+      --surface: #f8fbff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue: #2563eb;
+      --green: #10b981;
+      --red: #ef4444;
+      --shadow: 0 30px 90px rgba(15,23,42,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg,#eef6ff 0%,#f7fbff 100%);
+      color: var(--text);
+      font-family: 'Poppins', sans-serif;
+    }
+
+    /* ── Toast ──────────────────────────────────── */
+    #toast-container {
+      position: fixed; top: 20px; right: 20px;
+      z-index: 9999; display: flex; flex-direction: column; gap: 10px;
+    }
+    .toast {
+      padding: 14px 20px; border-radius: 14px; font-size: 0.9rem;
+      font-weight: 500; color: #fff; min-width: 260px; max-width: 360px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      animation: slideIn 0.25s ease; pointer-events: none;
+    }
+    .toast.success { background: var(--green); }
+    .toast.error   { background: var(--red); }
+    .toast.info    { background: var(--blue); }
+    @keyframes slideIn { from { transform:translateX(120%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+    @keyframes slideOut{ from { transform:translateX(0); opacity:1; } to { transform:translateX(120%); opacity:0; } }
+
+    /* ── Auth Screen ─────────────────────────────── */
+    #auth-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .auth-card {
+      background: var(--card); border-radius: 28px;
+      padding: 40px; width: 100%; max-width: 440px;
+      box-shadow: var(--shadow); border: 1px solid rgba(148,163,184,0.18);
+    }
+    .auth-card h1 { margin: 0 0 4px; font-size: 1.8rem; }
+    .auth-card p  { margin: 0 0 28px; color: var(--muted); font-size: 0.95rem; }
+    .auth-tabs {
+      display: flex; gap: 0; border-radius: 14px; overflow: hidden;
+      border: 1px solid rgba(148,163,184,0.2); margin-bottom: 24px;
+    }
+    .auth-tab {
+      flex: 1; padding: 11px; text-align: center; cursor: pointer;
+      font-weight: 600; font-size: 0.9rem; border: none; background: transparent;
+      color: var(--muted); transition: all 0.2s;
+    }
+    .auth-tab.active { background: var(--blue); color: #fff; border-radius: 12px; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .field label { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+    .field input {
+      padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(148,163,184,0.25);
+      font-size: 0.95rem; font-family: 'Poppins', sans-serif; outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .field input:focus {
+      border-color: rgba(37,99,235,0.5); box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+    .auth-error {
+      background: #fef2f2; color: var(--red); border: 1px solid #fecaca;
+      border-radius: 10px; padding: 10px 14px; font-size: 0.88rem;
+      margin-bottom: 14px; display: none;
+    }
+
+    /* ── Dashboard ───────────────────────────────── */
+    #dashboard { display: none; padding: 24px; }
+    .page-shell { max-width: 1220px; margin: 0 auto; display: grid; gap: 24px; }
+    .page-header {
+      display: flex; flex-wrap: wrap; justify-content: space-between;
+      gap: 18px; align-items: center;
+      background: linear-gradient(135deg,#ffffff 0%,#ebf3ff 100%);
+      border: 1px solid rgba(148,163,184,0.18); border-radius: 28px;
+      padding: 32px; box-shadow: var(--shadow);
+    }
+    .eyebrow { color: #475569; font-size: 0.9rem; letter-spacing: 0.12em; text-transform: uppercase; }
+    .page-header h1 { margin: 0; font-size: clamp(1.8rem,2.5vw,2.8rem); }
+    .page-header p  { margin: 0; color: var(--muted); line-height: 1.8; max-width: 46rem; }
+    .header-pill-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .pill {
+      padding: 10px 16px; border-radius: 999px;
+      background: rgba(37,99,235,0.12); color: var(--blue);
+      font-weight: 600; font-size: 0.9rem; cursor: pointer;
+    }
+    .pill.logout { background: rgba(239,68,68,0.1); color: var(--red); }
+    .user-pill { background: rgba(16,185,129,0.1); color: var(--green); cursor: default; }
+
+    .summary-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
+    .summary-card, .card, .small-card {
+      background: var(--card); border-radius: 24px;
+      border: 1px solid rgba(148,163,184,0.18); box-shadow: var(--shadow); padding: 26px;
+    }
+    .summary-card { transition: transform 0.2s ease, border-color 0.2s ease; }
+    .summary-card:hover { transform: translateY(-3px); border-color: rgba(37,99,235,0.35); }
+    .label { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    .value { margin: 0.75rem 0 0; font-size: clamp(1.8rem,2.5vw,2.8rem); font-weight: 700; }
+
+    .main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .card h2 { margin-top: 0; margin-bottom: 18px; font-size: 1.4rem; }
+    .chart-row { display: grid; gap: 24px; }
+    .chart-block {
+      background: var(--surface); border-radius: 22px;
+      border: 1px solid rgba(148,163,184,0.12); padding: 20px;
+    }
+    .chart-block h3 { margin-top: 0; margin-bottom: 18px; font-size: 1rem; font-weight: 600; }
+    canvas { width: 100% !important; height: 260px !important; }
+    .sidebar-stack { display: grid; gap: 20px; }
+    .section-note { color: var(--muted); font-size: 0.9rem; margin: 0 0 16px; line-height: 1.7; }
+
+    .inputs-row { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; margin-bottom: 16px; }
+    input, select, button {
+      width: 100%; border-radius: 12px; border: 1px solid rgba(148,163,184,0.2);
+      background: #fff; padding: 12px 14px; font-size: 0.95rem;
+      color: var(--text); font-family: 'Poppins', sans-serif; outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus { border-color: rgba(37,99,235,0.45); box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
+    .btn-submit {
+      display: inline-flex; justify-content: center; align-items: center; gap: 8px;
+      background: linear-gradient(135deg,#2563eb,#4f46e5); color: #fff;
+      border: none; border-radius: 12px; cursor: pointer; font-weight: 700;
+      transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s; min-height: 48px;
+    }
+    .btn-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 14px 32px rgba(37,99,235,0.2); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .insights-list, .transactions-list, .progress-list { display: grid; gap: 12px; }
+    .insight-item {
+      background: #fff; border-radius: 14px; border: 1px solid rgba(148,163,184,0.12);
+      padding: 14px 16px; box-shadow: 0 8px 20px rgba(15,23,42,0.04);
+      border-left: 4px solid var(--blue); font-size: 0.9rem; line-height: 1.6;
+    }
+    .transaction-item {
+      background: #fff; border-radius: 14px; border: 1px solid rgba(148,163,184,0.12);
+      padding: 14px 16px; box-shadow: 0 8px 20px rgba(15,23,42,0.04);
+      display: grid; grid-template-columns: 1fr auto 80px; gap: 10px; align-items: center;
+    }
+    .transaction-meta { color: var(--muted); font-size: 0.88rem; line-height: 1.4; }
+    .transaction-value { font-weight: 700; }
+    .transaction-actions { display: flex; gap: 6px; }
+    .btn-action {
+      background: none; border: none; cursor: pointer; font-size: 1.1rem;
+      padding: 4px; border-radius: 6px; transition: background 0.2s; width: auto;
+    }
+    .btn-action:hover { background: rgba(0,0,0,0.07); }
+    .progress-item {
+      background: #fff; border-radius: 14px; border: 1px solid rgba(148,163,184,0.12);
+      padding: 14px 16px; box-shadow: 0 8px 20px rgba(15,23,42,0.04);
+    }
+    .progress-item .title-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px; font-weight: 600;
+    }
+    .progress-bar { width: 100%; height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    .progress-fill {
+      height: 100%; background: linear-gradient(90deg,#10b981 0%,#34d399 100%);
+      transition: width 0.4s ease;
+    }
+    .empty-state {
+      color: var(--muted); padding: 20px; border-radius: 14px; background: #f8fafc;
+      text-align: center; border: 1px dashed rgba(148,163,184,0.35); font-size: 0.9rem;
+    }
+
+    /* skeleton loading */
+    .skeleton {
+      background: linear-gradient(90deg,#f0f4f8 25%,#e2e8f0 50%,#f0f4f8 75%);
+      background-size: 200% 100%; animation: shimmer 1.4s infinite;
+      border-radius: 10px; height: 20px;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 760px) {
+      .summary-grid, .inputs-row { grid-template-columns: 1fr; }
+      .page-header { padding: 20px; }
+      #dashboard { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Toast container ───────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ── Auth screen ───────────────────────────── -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <h1>💰 Finance360</h1>
+    <p>Your personal finance tracker</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login"  onclick="switchTab('login')">Login</button>
+      <button class="auth-tab"        id="tab-register" onclick="switchTab('register')">Register</button>
+    </div>
+
+    <div id="auth-error" class="auth-error"></div>
+
+    <!-- Login form -->
+    <div id="form-login">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="you@example.com" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="Your password" />
+      </div>
+      <button class="btn-submit" id="btn-login" onclick="handleLogin()" style="margin-top:4px">
+        Login
+      </button>
+    </div>
+
+    <!-- Register form -->
+    <div id="form-register" style="display:none">
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="reg-name" placeholder="Your full name" />
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="you@example.com" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="reg-password" placeholder="Min 6 characters" />
+      </div>
+      <button class="btn-submit" id="btn-register" onclick="handleRegister()" style="margin-top:4px">
+        Create Account
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Dashboard ─────────────────────────────── -->
+<div id="dashboard">
+  <div class="page-shell">
+
+    <header class="page-header">
+      <div>
+        <h1>Finance360</h1>
+        <p class="section-note">Monitor your cashflow, savings, and goals — powered by your own backend.</p>
+      </div>
+      <div class="header-pill-row">
+        <span class="pill user-pill" id="user-pill">👤 Loading...</span>
+        <span class="pill logout" onclick="handleLogout()">🚪 Logout</span>
+      </div>
+    </header>
+
+    <section class="summary-grid">
+      <article class="summary-card">
+        <p class="label">Balance</p>
+        <p class="value" id="totalBalance">₹0</p>
+      </article>
+      <article class="summary-card">
+        <p class="label">Total Income</p>
+        <p class="value" id="totalIncome" style="color:var(--green)">₹0</p>
+      </article>
+      <article class="summary-card">
+        <p class="label">Total Expense</p>
+        <p class="value" id="totalExpense" style="color:var(--red)">₹0</p>
+      </article>
+    </section>
+
+    <section class="main-grid">
+      <div class="card">
+        <h2>📈 Analytics</h2>
+        <p class="section-note">Charts built from your real transaction data.</p>
+        <div class="chart-row">
+          <div class="chart-block">
+            <h3>Expenses by Category</h3>
+            <canvas id="expenseChart"></canvas>
+            <div id="expenseEmpty" class="empty-state" style="margin-top:12px;display:none">No expense records yet.</div>
+          </div>
+          <div class="chart-block">
+            <h3>Income vs Expense</h3>
+            <canvas id="incomeExpenseChart"></canvas>
+          </div>
+          <div class="chart-block">
+            <h3>Savings Trend</h3>
+            <canvas id="savingsChart"></canvas>
+            <div id="savingsEmpty" class="empty-state" style="margin-top:12px;display:none">No data yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-stack">
+        <div class="small-card">
+          <h2>💡 Insights</h2>
+          <p class="section-note">AI-powered recommendations from your data.</p>
+          <button class="btn-submit" id="insightsButton" onclick="loadInsights()">Generate Insights</button>
+          <div id="insightsList" style="margin-top:14px">
+            <div class="empty-state">Click Generate to load insights.</div>
+          </div>
+        </div>
+
+        <div class="small-card">
+          <h2>📅 Monthly Report</h2>
+          <p class="section-note">View your income, expenses, and savings for any month.</p>
+          <div class="inputs-row">
+            <input type="number" id="reportYear"  placeholder="Year" min="2020" />
+            <input type="number" id="reportMonth" placeholder="Month" min="1" max="12" />
+          </div>
+          <button class="btn-submit" id="monthlyButton" onclick="loadMonthlyReport()">Get Report</button>
+          <div id="monthlyReport" style="margin-top:16px"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div style="display:grid;gap:20px">
+        <div>
+          <h2>🎯 Goals</h2>
+          <p class="section-note">Set savings goals and track progress automatically.</p>
+        </div>
+        <div class="inputs-row">
+          <input type="text"   id="goalName"     placeholder="Goal name (e.g. New Laptop)" />
+          <input type="number" id="targetAmount" placeholder="Target ₹ amount" />
+          <input type="date"   id="deadline" />
+          <button class="btn-submit" id="goalSubmitBtn" onclick="handleGoalSubmit()">Set Goal</button>
+        </div>
+        <div>
+          <h3 style="margin-bottom:12px">Goal Progress</h3>
+          <div id="goalProgress" class="progress-list">
+            <div class="empty-state">Set a goal to see progress.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div style="display:grid;gap:20px">
+        <div>
+          <h2>💸Add Transaction</h2>
+          <p class="section-note">Record income or expenses — dashboard refreshes automatically.</p>
+        </div>
+        <div class="inputs-row">
+          <input type="number" id="amount"   placeholder="Amount (₹)" />
+          <select id="type">
+            <option value="INCOME"> 📥Income</option>
+            <option value="EXPENSE">📤Expense</option>
+          </select>
+          <input type="text" id="category" placeholder="Category (e.g. Salary, Food)" />
+          <input type="date" id="date" />
+          <button class="btn-submit" id="txSubmitBtn" onclick="handleTransactionSubmit()">Add Transaction</button>
+          <button class="btn-submit" id="txCancelBtn" onclick="cancelEdit()"
+                  style="background:linear-gradient(135deg,#6b7280,#4b5563);display:none">Cancel Edit</button>
+        </div>
+        <div>
+          <h3 style="margin-bottom:12px">Transaction History</h3>
+          <div id="transactionsList" class="transactions-list">
+            <div class="empty-state">No transactions yet.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════════════════════ */
+const API = "http://localhost:8080";
+
+/* ═══════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════ */
+const state = {
+  token: null,
+  user: null,
+  transactions: [],
+  goals: [],
+  editingId: null,
+  charts: { expense: null, incomeExpense: null, savings: null }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   TOAST  (replaces all alert() calls)
+═══════════════════════════════════════════════════════════════ */
+function toast(message, type = 'info', duration = 3500) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => {
+    el.style.animation = 'slideOut 0.25s ease forwards';
+    setTimeout(() => el.remove(), 250);
+  }, duration);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUTH TAB SWITCH
+═══════════════════════════════════════════════════════════════ */
+function switchTab(tab) {
+  document.getElementById('form-login').style.display    = tab === 'login'    ? 'block' : 'none';
+  document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+  clearAuthError();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function clearAuthError() {
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+function setAuthButtonLoading(id, loading) {
+  const btn = document.getElementById(id);
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Please wait...' : (id === 'btn-login' ? 'Login' : 'Create Account');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUTH HANDLERS
+═══════════════════════════════════════════════════════════════ */
+async function handleLogin() {
+  clearAuthError();
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { showAuthError('Please enter email and password.'); return; }
+
+  setAuthButtonLoading('btn-login', true);
+  try {
+    const data = await apiCall('/auth/login', 'POST', { email, password }, false);
+    storeSession(data);
+    showDashboard();
+    toast(`Welcome back, ${data.name}! 👋`, 'success');
+  } catch (err) {
+    showAuthError(err.message || 'Login failed. Check your credentials.');
+  } finally {
+    setAuthButtonLoading('btn-login', false);
+  }
+}
+
+async function handleRegister() {
+  clearAuthError();
+  const name     = document.getElementById('reg-name').value.trim();
+  const email    = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  if (!name || !email || !password) { showAuthError('All fields are required.'); return; }
+  if (password.length < 6)          { showAuthError('Password must be at least 6 characters.'); return; }
+
+  setAuthButtonLoading('btn-register', true);
+  try {
+    const data = await apiCall('/auth/register', 'POST', { name, email, password }, false);
+    storeSession(data);
+    showDashboard();
+    toast(`Account created! Welcome, ${data.name} 🎉`, 'success');
+  } catch (err) {
+    showAuthError(err.message || 'Registration failed.');
+  } finally {
+    setAuthButtonLoading('btn-register', false);
+  }
+}
+
+function storeSession(data) {
+  state.token = data.token;
+  state.user  = { email: data.email, name: data.name };
+  // Persist across page refresh
+  localStorage.setItem('finance360_token', data.token);
+  localStorage.setItem('finance360_user',  JSON.stringify(state.user));
+}
+
+function handleLogout() {
+  localStorage.removeItem('finance360_token');
+  localStorage.removeItem('finance360_user');
+  state.token = null; state.user = null;
+  state.transactions = []; state.goals = [];
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  toast('Logged out successfully.', 'info');
+}
+
+function showDashboard() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display   = 'block';
+  document.getElementById('user-pill').textContent = `👤 ${state.user.name}`;
+
+  // Pre-fill month/year
+  const now = new Date();
+  document.getElementById('reportYear').value  = now.getFullYear();
+  document.getElementById('reportMonth').value = now.getMonth() + 1;
+
+  initDashboard();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   API HELPER  — always sends JWT header
+═══════════════════════════════════════════════════════════════ */
+async function apiCall(path, method = 'GET', body = null, auth = true) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (auth && state.token) headers['Authorization'] = `Bearer ${state.token}`;
+
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+
+  const res = await fetch(API + path, opts);
+
+  // Token expired — force re-login
+  if (res.status === 401 && auth) {
+    handleLogout();
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  if (res.status === 204) return null;
+
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { json = { detail: text }; }
+
+  if (!res.ok) {
+    // ProblemDetail format from GlobalExceptionHandler
+    throw new Error(json.detail || json.message || `Request failed (${res.status})`);
+  }
+  return json;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FORMATTERS
+═══════════════════════════════════════════════════════════════ */
+function fmt(value) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency', currency: 'INR', maximumFractionDigits: 0
+  }).format(value ?? 0);
+}
+
+function setLoading(btnId, loading, loadText = 'Loading...', defaultText) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.textContent = loading ? loadText : defaultText;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD INIT
+═══════════════════════════════════════════════════════════════ */
+async function initDashboard() {
+  await Promise.allSettled([
+    loadTransactions(),
+    loadGoals(),
+    loadInsights()
+  ]);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TRANSACTIONS
+═══════════════════════════════════════════════════════════════ */
+async function loadTransactions() {
+  try {
+    const data = await apiCall('/transactions');
+    state.transactions = Array.isArray(data) ? data : [];
+    renderTransactions();
+    renderSummary();
+    renderCharts();
+    renderGoalProgress();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+function renderSummary() {
+  const income  = state.transactions.filter(t => t.type === 'INCOME').reduce((s,t) => s+t.amount, 0);
+  const expense = state.transactions.filter(t => t.type === 'EXPENSE').reduce((s,t) => s+t.amount, 0);
+  document.getElementById('totalIncome').textContent  = fmt(income);
+  document.getElementById('totalExpense').textContent = fmt(expense);
+  document.getElementById('totalBalance').textContent = fmt(income - expense);
+}
+
+function renderTransactions() {
+  const el = document.getElementById('transactionsList');
+  if (!state.transactions.length) {
+    el.innerHTML = '<div class="empty-state">No transactions yet. Add your first one above.</div>';
+    return;
+  }
+  // Show newest first
+  const sorted = [...state.transactions].sort((a,b) => b.date.localeCompare(a.date));
+  el.innerHTML = sorted.map(tx => `
+    <div class="transaction-item">
+      <div>
+        <div class="transaction-value">${tx.category}</div>
+        <div class="transaction-meta">${tx.date} &nbsp;•&nbsp; ${tx.type}</div>
+        ${tx.note ? `<div class="transaction-meta">${tx.note}</div>` : ''}
+      </div>
+      <div class="transaction-value" style="color:${tx.type === 'EXPENSE' ? 'var(--red)' : 'var(--green)'}">
+        ${tx.type === 'EXPENSE' ? '−' : '+'}${fmt(tx.amount)}
+      </div>
+      <div class="transaction-actions">
+        <button class="btn-action" onclick="startEdit(${tx.id})" title="Edit">✏️</button>
+        <button class="btn-action" onclick="deleteTransaction(${tx.id})" title="Delete">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function handleTransactionSubmit() {
+  const amount   = Number(document.getElementById('amount').value);
+  const type     = document.getElementById('type').value;
+  const category = document.getElementById('category').value.trim();
+  const date     = document.getElementById('date').value;
+
+  if (!amount || amount <= 0) { toast('Amount must be greater than zero.', 'error'); return; }
+  if (!category)              { toast('Category is required.', 'error'); return; }
+  if (!date)                  { toast('Date is required.', 'error'); return; }
+
+  const payload = { amount, type, category, date };
+  const isEdit  = !!state.editingId;
+  const btn     = document.getElementById('txSubmitBtn');
+  btn.disabled  = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    if (isEdit) {
+      await apiCall(`/transactions/${state.editingId}`, 'PUT', payload);
+      toast('Transaction updated.', 'success');
+    } else {
+      await apiCall('/transactions', 'POST', payload);
+      toast('Transaction added.', 'success');
+    }
+    cancelEdit();
+    await loadTransactions();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = isEdit ? 'Update Transaction' : 'Add Transaction';
+  }
+}
+
+function startEdit(id) {
+  const tx = state.transactions.find(t => t.id === id);
+  if (!tx) return;
+  document.getElementById('amount').value   = tx.amount;
+  document.getElementById('type').value     = tx.type;
+  document.getElementById('category').value = tx.category;
+  document.getElementById('date').value     = tx.date;
+  state.editingId = id;
+  document.getElementById('txSubmitBtn').textContent = 'Update Transaction';
+  document.getElementById('txCancelBtn').style.display = 'inline-flex';
+  document.getElementById('txSubmitBtn').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelEdit() {
+  state.editingId = null;
+  ['amount','category','date'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('type').value = 'INCOME';
+  document.getElementById('txSubmitBtn').textContent = 'Add Transaction';
+  document.getElementById('txCancelBtn').style.display = 'none';
+}
+
+async function deleteTransaction(id) {
+  if (!confirm('Delete this transaction?')) return;
+  try {
+    await apiCall(`/transactions/${id}`, 'DELETE');
+    toast('Transaction deleted.', 'success');
+    await loadTransactions();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GOALS
+═══════════════════════════════════════════════════════════════ */
+async function loadGoals() {
+  try {
+    const data = await apiCall('/goals');
+    state.goals = Array.isArray(data) ? data : [];
+    renderGoalProgress();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function handleGoalSubmit() {
+  const name         = document.getElementById('goalName').value.trim();
+  const targetAmount = Number(document.getElementById('targetAmount').value);
+  const deadline     = document.getElementById('deadline').value;
+  if (!name || !targetAmount || !deadline) { toast('All goal fields are required.', 'error'); return; }
+
+  const btn = document.getElementById('goalSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    await apiCall('/goals', 'POST', { name, targetAmount, deadline });
+    toast('Goal created!', 'success');
+    document.getElementById('goalName').value = '';
+    document.getElementById('targetAmount').value = '';
+    document.getElementById('deadline').value = '';
+    await loadGoals();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Set Goal';
+  }
+}
+
+function renderGoalProgress() {
+  const el = document.getElementById('goalProgress');
+  if (!state.goals.length) {
+    el.innerHTML = '<div class="empty-state">No goals set yet.</div>'; return;
+  }
+  const savings = state.transactions.reduce((s,t) => s + (t.type === 'INCOME' ? t.amount : -t.amount), 0);
+  el.innerHTML = state.goals.map(g => {
+    const pct = g.targetAmount ? Math.min((savings / g.targetAmount) * 100, 100) : 0;
+    const color = pct >= 100 ? 'var(--green)' : pct >= 50 ? 'var(--blue)' : 'var(--red)';
+    return `
+      <div class="progress-item">
+        <div class="title-row">
+          <span>${g.name}</span>
+          <span style="color:${color}">${pct.toFixed(1)}%</span>
+        </div>
+        <div class="transaction-meta">Target: ${fmt(g.targetAmount)} &nbsp;•&nbsp; Deadline: ${g.deadline}</div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${pct}%;background:${color}"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INSIGHTS
+═══════════════════════════════════════════════════════════════ */
+async function loadInsights() {
+  const btn = document.getElementById('insightsButton');
+  btn.disabled = true; btn.textContent = 'Loading...';
+  try {
+    const data = await apiCall('/insights');
+    const el = document.getElementById('insightsList');
+    if (!Array.isArray(data) || !data.length) {
+      el.innerHTML = '<div class="empty-state">No insights yet — add more transactions.</div>';
+      return;
+    }
+    el.innerHTML = data.map(i => `<div class="insight-item">${i}</div>`).join('');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Refresh Insights';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MONTHLY REPORT
+═══════════════════════════════════════════════════════════════ */
+async function loadMonthlyReport() {
+  const year  = Number(document.getElementById('reportYear').value);
+  const month = Number(document.getElementById('reportMonth').value);
+  if (!year || !month || month < 1 || month > 12) {
+    toast('Enter a valid year and month (1–12).', 'error'); return;
+  }
+  const btn = document.getElementById('monthlyButton');
+  btn.disabled = true; btn.textContent = 'Loading...';
+  try {
+    const r = await apiCall(`/insights/monthly?year=${year}&month=${month}`);
+    const goalsHtml = Array.isArray(r.goals) && r.goals.length
+      ? r.goals.map(g => `<li style="margin-bottom:4px">${g}</li>`).join('')
+      : '<li>No goals tracked this month.</li>';
+    document.getElementById('monthlyReport').innerHTML = `
+      <div style="display:grid;gap:10px;margin-top:4px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="background:#f0fdf4;border-radius:12px;padding:12px">
+            <div style="font-size:0.8rem;color:var(--muted)">Income</div>
+            <div style="font-weight:700;color:var(--green)">${fmt(r.income)}</div>
+          </div>
+          <div style="background:#fef2f2;border-radius:12px;padding:12px">
+            <div style="font-size:0.8rem;color:var(--muted)">Expense</div>
+            <div style="font-weight:700;color:var(--red)">${fmt(r.expense)}</div>
+          </div>
+        </div>
+        <div style="background:#eff6ff;border-radius:12px;padding:12px">
+          <div style="font-size:0.8rem;color:var(--muted)">Net Savings</div>
+          <div style="font-weight:700;color:var(--blue)">${fmt(r.savings)}</div>
+        </div>
+        <div style="background:#f8fafc;border-radius:12px;padding:12px;font-size:0.88rem">
+          🏆 Top Category: <strong>${r.topCategory || 'N/A'}</strong>
+        </div>
+        <div style="background:#f8fafc;border-radius:12px;padding:12px;font-size:0.88rem">
+          <strong>Goals:</strong><ul style="margin:6px 0 0;padding-left:18px">${goalsHtml}</ul>
+        </div>
+      </div>`;
+  } catch (err) {
+    toast(err.message, 'error');
+    document.getElementById('monthlyReport').innerHTML =
+      '<div class="empty-state">No data for this month.</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Get Report';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CHARTS
+═══════════════════════════════════════════════════════════════ */
+function renderCharts() {
+  const txns    = state.transactions;
+  const expense = txns.filter(t => t.type === 'EXPENSE');
+  const income  = txns.filter(t => t.type === 'INCOME');
+
+  // Expense pie
+  const cats = {};
+  expense.forEach(t => {
+    const k = (t.category||'Other').toLowerCase();
+    cats[k] = (cats[k]||0) + t.amount;
+  });
+  const expCtx = document.getElementById('expenseChart').getContext('2d');
+  if (state.charts.expense) state.charts.expense.destroy();
+  document.getElementById('expenseEmpty').style.display = expense.length ? 'none' : 'block';
+  if (expense.length) {
+    state.charts.expense = new Chart(expCtx, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(cats),
+        datasets: [{ data: Object.values(cats),
+          backgroundColor: ['#3b82f6','#6366f1','#38bdf8','#4ade80','#f97316','#fb7185','#a78bfa','#facc15']
+        }]
+      },
+      options: { plugins: { legend: { position: 'bottom' } }, cutout: '60%' }
+    });
+  }
+
+  // Bar: income vs expense
+  const ieCtx = document.getElementById('incomeExpenseChart').getContext('2d');
+  if (state.charts.incomeExpense) state.charts.incomeExpense.destroy();
+  state.charts.incomeExpense = new Chart(ieCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Income','Expense'],
+      datasets: [{
+        label: 'Amount (₹)',
+        data: [
+          income.reduce((s,t)=>s+t.amount,0),
+          expense.reduce((s,t)=>s+t.amount,0)
+        ],
+        backgroundColor: ['rgba(16,185,129,0.8)','rgba(239,68,68,0.8)'],
+        borderRadius: 8
+      }]
+    },
+    options: { responsive:true, scales:{ y:{ beginAtZero:true } }, plugins:{ legend:{ display:false } } }
+  });
+
+  // Line: cumulative savings trend
+  const daily = {};
+  txns.forEach(t => {
+    daily[t.date] = daily[t.date] || { i:0, e:0 };
+    if (t.type === 'INCOME') daily[t.date].i += t.amount;
+    else daily[t.date].e += t.amount;
+  });
+  const dates = Object.keys(daily).sort();
+  let running = 0;
+  const trend = dates.map(d => { running += daily[d].i - daily[d].e; return running; });
+  document.getElementById('savingsEmpty').style.display = dates.length ? 'none' : 'block';
+  const savCtx = document.getElementById('savingsChart').getContext('2d');
+  if (state.charts.savings) state.charts.savings.destroy();
+  if (dates.length) {
+    state.charts.savings = new Chart(savCtx, {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{
+          label: 'Cumulative Savings (₹)',
+          data: trend,
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37,99,235,0.1)',
+          fill: true, tension: 0.4, pointRadius: 4,
+          pointBackgroundColor: '#2563eb'
+        }]
+      },
+      options: { responsive:true, scales:{ y:{ beginAtZero:false } } }
+    });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BOOT — check for saved session on page load
+═══════════════════════════════════════════════════════════════ */
+(function boot() {
+  const savedToken = localStorage.getItem('finance360_token');
+  const savedUser  = localStorage.getItem('finance360_user');
+  if (savedToken && savedUser) {
+    state.token = savedToken;
+    state.user  = JSON.parse(savedUser);
+    showDashboard();
+  }
+})();
+</script>
+</body>
+</html>
