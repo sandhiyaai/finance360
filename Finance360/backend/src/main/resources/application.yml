@@ -1,0 +1,68 @@
+spring:
+  profiles:
+    active: dev
+
+app:
+  jwt:
+    secret: Finance360SuperSecretKeyForDevelopmentOnly2024ChangeInProd
+    expiration-ms: 86400000   # 24 hours
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+# ── DEV profile — H2 file-based (data survives restarts) ─────────
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    # "file:./financedb" saves the DB as a file in your project folder
+    # Change to an absolute path if you prefer, e.g: file:C:/data/financedb
+    url: jdbc:h2:file:./financedb;AUTO_SERVER=TRUE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    # "update" keeps existing data and only adds new columns/tables
+    # Never use "create-drop" unless you WANT data wiped on restart
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
+
+---
+# ── PROD profile — PostgreSQL ─────────────────────────────────────
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USER}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
